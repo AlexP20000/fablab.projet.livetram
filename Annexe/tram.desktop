@@ -1,6 +1,6 @@
 [Desktop Entry]
 Type=Application
-Exec= sudo python3 /home/pi/Documents/tram/V1/deserializeJson.py
+Exec= sudo python3 /home/pi/Documents/tram/V2/_V2/liveTram.py
 Hidden=false
 NoDisplay=false
 X-GNOME-Autostart-enabled=true
