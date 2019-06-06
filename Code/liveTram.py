@@ -1,7 +1,7 @@
 ###
 # @author William PENSEC
-# @version 1.0
-# @date 03/05/2019
+# @version 1.2
+# @date 06/06/2019
 # @description Ce code permet de gérer l'affichage d'un bandeau de LED en tenant compte du nombre de LED disponible.
 #       On récupère les valeurs de position du TRAM de Brest via l'API mise à notre disposition.
 #       Puis on allume la LED correspondante d'une certaine couleur
@@ -34,14 +34,23 @@ from neopixel import *
 import sys
 
 ### Paramétrage des variables ###
-# Configuration du bandeau de LED : #
-LED_COUNT       = 65			# Nombre de LED sur le bandeau
-LED_PIN         = 18			# Pin GPIO connecté au bandeau
-LED_FREQ_HZ     = 800000		# Fréquence du signal des LED en hertz
-LED_DMA         = 10			# Utilisation du "Direct Memomy Access" pour générer un signal
-LED_BRIGHTNESS  = 255		    # Luminosité : mettre à 0 pour sombre et 255 pour le plus lumineux
-LED_INVERT      = False		    # True pour inverser le signal (quand vous utilisez un réhausseur de signal de 3.3V à 5V avec un transistor NPN)
-LED_CHANNEL     = 0			    # Mettre à "1" pour les pin GPIO 13, 19, 41, 45 or 53
+# Configuration du bandeau de LED principal : #
+PR_LED_COUNT       = 65			# Nombre de LED sur le bandeau
+PR_LED_PIN         = 18			# Pin GPIO connecté au bandeau
+PR_LED_FREQ_HZ     = 800000		# Fréquence du signal des LED en hertz
+PR_LED_DMA         = 10			# Utilisation du "Direct Memomy Access" pour générer un signal
+PR_LED_BRIGHTNESS  = 255		# Luminosité : mettre à 0 pour sombre et 255 pour le plus lumineux
+PR_LED_INVERT      = False		# True pour inverser le signal (quand vous utilisez un réhausseur de signal de 3.3V à 5V avec un transistor NPN)
+PR_LED_CHANNEL     = 0			# Mettre à "1" pour les pin GPIO 13, 19, 41, 45 or 53
+
+# Configuration du bandeau de LED secondaire : #
+SEC_LED_COUNT      = 7          # NNombre de LED sur le bandeau
+SEC_LED_PIN        = 13         # Pin GPIO connecté au bandeau
+SEC_LED_FREQ_HZ    = 800000     # Fréquence du signal des LED en hertz
+SEC_LED_DMA        = 10         # Utilisation du "Direct Memomy Access" pour générer un signal
+SEC_LED_BRIGHTNESS = 50         # Luminosité : mettre à 0 pour sombre et 255 pour le plus lumineux
+SEC_LED_INVERT     = False      # True pour inverser le signal (quand vous utilisez un réhausseur de signal de 3.3V à 5V avec un transistor NPN)
+SEC_LED_CHANNEL    = 1          # Mettre à "1" pour les pin GPIO 13, 19, 41, 45 or 53
 
 # Configuration des variables d'attente et position maximale : #
 MAX_PLOUZANE    = 12300         # Valeur maximale de la position du tram sur la ligne "Porte de Plouzané"
@@ -69,17 +78,31 @@ def writeFic(nomPorte, idVehicule, position) :
 	fic.close()
 
 ### FONCTION PRINCIPALE ###
-# Create NeoPixel object with appropriate configuration.
-strip = Adafruit_NeoPixel(LED_COUNT, LED_PIN, LED_FREQ_HZ, LED_DMA, LED_INVERT, LED_BRIGHTNESS, LED_CHANNEL)
-# Initialize the library (must be called once before other functions).
-strip.begin()
+# Créer les objets Neopixels avec la configuration appropriée.
+strip_pr = Adafruit_NeoPixel(PR_LED_COUNT, PR_LED_PIN, PR_LED_FREQ_HZ, PR_LED_DMA, PR_LED_INVERT, PR_LED_BRIGHTNESS, PR_LED_CHANNEL)
+strip_sec = Adafruit_NeoPixel(SEC_LED_COUNT, SEC_LED_PIN, SEC_LED_FREQ_HZ, SEC_LED_DMA, SEC_LED_INVERT, SEC_LED_BRIGHTNESS, SEC_LED_CHANNEL)
+
+# Initialisation des librairies des bandeaux (doit être appelé avant toute fonction).
+strip_pr.begin()
+strip_sec.begin()
+
+# Allumage de la légende
+strip_sec.setPixelColor(0, Color(255,255,255)) # Blanc
+strip_sec.setPixelColor(1, Color(200,255,0)) # Jaune
+strip_sec.setPixelColor(2, Color(255,0,255)) # Cyan
+strip_sec.setPixelColor(3, Color(0,255,255)) # Magenta
+strip_sec.setPixelColor(4, Color(255,0,0)) # Vert
+strip_sec.setPixelColor(5, Color(0,255,0)) # Rouge
+strip_sec.setPixelColor(6, Color(0,0,255)) # Bleu
+
+strip_sec.show()
 
 ### Création de 3 listes pour chacune des portes ###
 # Possibilité de mettre jusqu'à 20 valeurs dans chaque liste
 listePlouzane = list(range(0,20))
 listeGouesnou = list(range(0,20))
 listeGuipavas = list(range(0,20))
-#Initialisation à une liste vide au début du programme pour éviter des valeurs stockées en mémoire à cet endroit
+# Initialisation d'une liste vide au début du programme pour éviter des valeurs stockées en mémoire à cet endroit
 del listePlouzane[:]
 del listeGouesnou[:]
 del listeGuipavas[:]
@@ -90,18 +113,17 @@ try :
         ### Récupération des données de localisation des trams pour Porte De Plouzané ###
         try :
             try :
-                # On fait la requête sur l'API avec en paramètre: le format (json), le numéro de ligne (A pour le tram), la direction vers la Porte de Guipavas
+                # On fait la requête sur l'API avec en paramètre : le format (json), le numéro de ligne (A pour le tram), la direction vers la Porte de Guipavas
                 reponse = requests.get('https://applications002.brest-metropole.fr/WIPOD01/Transport/REST/getGeolocatedVehiclesPosition?format=json&route_id=A&trip_headsign=porte%20de%20plouzane')
 
                 # Si la requête échoue, on retente jusqu'à réussir
                 while len(reponse.text) == 0 or reponse.text == None :
                     reponse = requests.get('https://applications002.brest-metropole.fr/WIPOD01/Transport/REST/getGeolocatedVehiclesPosition?format=json&route_id=A&trip_headsign=porte%20de%20plouzane')
-                    print("None guipavas")
-                    time.sleep(DELAY_NR) # Attente entre chaque requête car sinon il peut y avoir des erreurs
+                    print("None Plouzané")
+                    time.sleep(DELAY_NR) # Attente entre chaque requête
             
             except requests.exceptions.ConnectionError :
                 print("Erreur de Connexion Porte de Plouzané")
-                #renewIP()
                 time.sleep(DELAY_CE)
                 continue
                     
@@ -111,13 +133,13 @@ try :
             obj_dict = JSONDecoder().decode(reponse.text)
             # Affichage simple avec la couleur de la LED correspondante
             print ("Porte de Plouzane (Bleu)")
-            # Iterateur du nombre de rames en services sur la ligne
+            # Itérateur du nombre de rames en services sur la ligne
             i = 0
             while (len(obj_dict)) != i :
             ###### ====================== ETAPE 3 ====================== ###### 
-                # On calcule la valeur de la LED selon le nombre de LED disponible et les valeurs minimales et maximales constatées de position
-                val = valmap(int(obj_dict [i]['Pos']), 0, ((LED_COUNT - 1) - 8), 0, MAX_PLOUZANE)
-                val = val - ((LED_COUNT - 1) - 8) # Les valeurs de Porte de PLouzané doivent être prises dans le sens inverse car la valeur "0" se trouve sur la porte de Gouesnou/Guipavas
+                # On calcule la valeur de la LED selon le nombre de LED disponible et les valeurs minimales et maximales de position constatées
+                val = valmap(int(obj_dict [i]['Pos']), 0, ((PR_LED_COUNT - 1) - 8), 0, MAX_PLOUZANE)
+                val = val - ((PR_LED_COUNT - 1) - 8) # Les valeurs de Porte de PLouzané doivent être prises dans le sens inverse car la valeur "0" se trouve sur la porte de Gouesnou/Guipavas
                 val = abs (val) # Depuis la valeur de LED transmise par la fonction, on retranche le nombre de LED et on prend la valeur absolue ensuite
                 print(int(obj_dict [i]['Pos']), end='')
                 print(" : ", end='')
@@ -146,14 +168,14 @@ try :
         ### Récupération des données de localisation des trams pour Porte De Gouesnou ###
         try :
             try :
-                # On fait la requête sur l'API avec en paramètre: le format (json), le numéro de ligne (A pour le tram), la direction vers la Porte de Guipavas
+                # On fait la requête sur l'API avec en paramètre : le format (json), le numéro de ligne (A pour le tram), la direction vers la Porte de Guipavas
                 reponse = requests.get('https://applications002.brest-metropole.fr/WIPOD01/Transport/REST/getGeolocatedVehiclesPosition?format=json&route_id=A&trip_headsign=porte%20de%20gouesnou')
 
                 # Si la requête échoue, on retente jusqu'à réussir
                 while len(reponse.text) == 0 or reponse.text == None :
                     reponse = requests.get('https://applications002.brest-metropole.fr/WIPOD01/Transport/REST/getGeolocatedVehiclesPosition?format=json&route_id=A&trip_headsign=porte%20de%20gouesnou')
-                    print("None guipavas")
-                    time.sleep(DELAY_NR) # Attente entre chaque requête car sinon il peut y avoir des erreurs
+                    print("None Gouesnou")
+                    time.sleep(DELAY_NR) # Attente entre chaque requête
             
             except requests.exceptions.ConnectionError :
                 print("Erreur de Connexion Porte de Gouesnou")
@@ -165,16 +187,16 @@ try :
             obj_dict = JSONDecoder().decode(reponse.text)
             # Affichage simple avec la couleur de la LED correspondante
             print ("Porte de Gouesnou (Rouge)")
-            # Iterateur du nombre de rames en services sur la ligne
+            # Itérateur du nombre de rames en services sur la ligne
             i = 0
             while (len(obj_dict)) != i :
             ###### ====================== ETAPE 3 ====================== ######
                 # On calcule la valeur de la LED selon le nombre de LED disponible et les valeurs minimales et maximales constatées de position
-                val = valmap(int(obj_dict [i]['Pos']), 0, ((LED_COUNT - 1) - 8), 0, MAX_GOUESNOU)
+                val = valmap(int(obj_dict [i]['Pos']), 0, ((PR_LED_COUNT - 1) - 8), 0, MAX_GOUESNOU)
                 print(int(obj_dict [i]['Pos']), end='')
                 print(" : ", end='')
                 # Écriture sur le fichier
-                #writeFic("Porte de Gouesnou", obj_dict [i]['IdVehicle'], obj_dict [i]['Pos'])
+                # writeFic("Porte de Gouesnou", obj_dict [i]['IdVehicle'], obj_dict [i]['Pos'])
                 # On ajoute la valeur à la fin de la liste créée pour la porte de Gouesnou
                 if (val > 48) :
                     print(val + 9)
@@ -201,7 +223,7 @@ try :
                 # Si la requête échoue, on retente jusqu'à réussir
                 while len(reponse.text) == 0 or reponse.text == None :
                     reponse = requests.get('https://applications002.brest-metropole.fr/WIPOD01/Transport/REST/getGeolocatedVehiclesPosition?format=json&route_id=A&trip_headsign=porte%20de%20guipavas')
-                    print("None guipavas")
+                    print("None Guipavas")
                     time.sleep(DELAY_NR) # Attente entre chaque requête car sinon il peut y avoir des erreurs
             
             except requests.exceptions.ConnectionError :
@@ -219,7 +241,7 @@ try :
             while (len(obj_dict)) != i :
             ###### ====================== ETAPE 3 ====================== ######
                 # On calcule la valeur de la LED selon le nombre de LED disponible et les valeurs minimales et maximales constatées de position
-                val = valmap(int(obj_dict [i]['Pos']), 0, ((LED_COUNT - 1) - 8), 0, MAX_GUIPAVAS)
+                val = valmap(int(obj_dict [i]['Pos']), 0, ((PR_LED_COUNT - 1) - 8), 0, MAX_GUIPAVAS)
                 print(int(obj_dict [i]['Pos']), end='')
                 print(" : ", end='')
                 print(val)
@@ -238,9 +260,9 @@ try :
         ###### ====================== ETAPE 4 ====================== ######
         # On éteint tous les pixels du bandeau afin de réactualiser les données visuelles
         iter = 0
-        while iter != strip.numPixels() :
-            strip.setPixelColor(iter , Color(0,0,0))
-            strip.show()
+        while iter != strip_pr.numPixels() :
+            strip_pr.setPixelColor(iter , Color(0,0,0))
+            strip_pr.show()
             iter = iter + 1
 
         # Vérification pour chaque valeur d'une liste si cette même valeur est également présente dans une autre liste :
@@ -250,31 +272,31 @@ try :
         # Cas extrêmement rare => 3 trams différents au même arrêt; la couleur sera blanche mais normalement c'est impossible d'obtenir ce résultat
         for valeurListe in listePlouzane :
             if((valeurListe in listeGouesnou) > 0):
-                strip.setPixelColor(valeurListe , Color(0,255,255)) # Plouzané/Gouesnou => Magenta
+                strip_pr.setPixelColor(valeurListe , Color(0,255,255)) # Plouzané/Gouesnou => Magenta
                 if((valeurListe in listeGuipavas) > 0):
-                    strip.setPixelColor(valeurListe , Color(255,255,255)) # Plouzané/Gouesnou/Guipavas => Blanc
+                    strip_pr.setPixelColor(valeurListe , Color(255,255,255)) # Plouzané/Gouesnou/Guipavas => Blanc
                     listeGuipavas.remove(valeurListe)
                     print ("Superposition Porte de Plouzané/Gouesnou/Guipavas (Blanc)")
                 listeGouesnou.remove(valeurListe)
                 print ("Superposition Porte de Plouzané/Gouesnou (Magenta)")
             else :
                 if((valeurListe in listeGuipavas) > 0):
-                    strip.setPixelColor(valeurListe , Color(255,0,255)) # Plouzané/Guipavas => Cyan
+                    strip_pr.setPixelColor(valeurListe , Color(255,0,255)) # Plouzané/Guipavas => Cyan
                     listeGuipavas.remove(valeurListe)
                     print ("Superposition Porte de Plouzané/Guipavas (Cyan)")
                 else :
-                    strip.setPixelColor(valeurListe , Color(0,0,255)) # Plouzané => Bleu
+                    strip_pr.setPixelColor(valeurListe , Color(0,0,255)) # Plouzané => Bleu
             
         for valeurListe in listeGouesnou :
             if((valeurListe in listeGuipavas) > 0):
-                strip.setPixelColor(valeurListe , Color(255,255,0)) # Gouesnou/Guipavas => Jaune
+                strip_pr.setPixelColor(valeurListe , Color(200,255,0)) # Gouesnou/Guipavas => Jaune
                 listeGuipavas.remove(valeurListe)
                 print ("Superposition Porte de Gouesnou/Guipavas (Jaune) ")
             else :
-                strip.setPixelColor(valeurListe , Color(0,255,0)) # Gouesnou => Rouge
+                strip_pr.setPixelColor(valeurListe , Color(0,255,0)) # Gouesnou => Rouge
                 
         for valeurListe in listeGuipavas :
-            strip.setPixelColor(valeurListe , Color(255,0,0)) # Guipavas => Vert
+            strip_pr.setPixelColor(valeurListe , Color(255,0,0)) # Guipavas => Vert
 
         # Remise à 0 des listes pour la prochaine itération   
         del listePlouzane[:]
@@ -282,7 +304,7 @@ try :
         del listeGuipavas[:]
 
         # Actualisation du bandeau de LED
-        strip.show()
+        strip_pr.show()
         print()
         print ("-------------------------------------------------")
         print()
